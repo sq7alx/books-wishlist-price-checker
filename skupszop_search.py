@@ -13,7 +13,13 @@ from difflib import SequenceMatcher
 def is_similar(a, b, threshold=0.8):
     return SequenceMatcher(None, a.lower(), b.lower()).ratio() >= threshold
 
-def run_skupszop_search(input_csv="books.csv", output_csv="skupszop_prices.csv", max_price=20):
+def run_skupszop_search(
+    input_csv="books.csv", 
+    output_csv="skupszop_prices.csv", 
+    max_price=20, progress_callback=None, 
+    result_callback=None
+):
+    
     # [0] clearing the output csv
     with open(output_csv, "w", newline="", encoding="utf-8") as f:
         writer = csv.writer(f)
@@ -26,21 +32,29 @@ def run_skupszop_search(input_csv="books.csv", output_csv="skupszop_prices.csv",
         for row in reader:
             books.append(row)
 
+    total = len(books)
+
     # [2] initialize Chrome WebDriver
     options = webdriver.ChromeOptions()
     options.add_argument("--start-maximized")
     options.add_argument("--window-size=1920,1080")
-    # options.add_argument("--headless")
+    #options.add_argument("--headless")
     driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=options)
 
-    results = []
-
-    for book in books:
+    for idx, book in enumerate(books):
         title = book["Title"]
         author = book["Author"]
+
+        # inform Streamlit which book is processing
+        if progress_callback:
+            try:
+                progress_callback(idx + 1, total if total else 1, title)
+            except Exception:
+                pass
+
         print(f"Searching: {title} - {author}")
 
-        # [3] building search URL with price filter (dynamiczne max_price)
+        # [3] building search URL with price filter (dynamic max_price)
         encoded_title = urllib.parse.quote(title)
         search_url = f"https://skupszop.pl/wyszukaj?keyword={encoded_title}&price_to={max_price}"
         driver.get(search_url)
@@ -103,12 +117,12 @@ def run_skupszop_search(input_csv="books.csv", output_csv="skupszop_prices.csv",
                         except:
                             continue
 
-                    if price.lower() == "brak":
+                    if price.lower() == "not found":
                         continue
 
                     # checking if price <= max_price
                     try:
-                        numeric_price = float(price.replace("zł", "").replace(",", ".").strip())
+                        numeric_price = float(price.replace("PLN", "").replace(",", ".").strip())
                         if numeric_price > max_price:
                             continue
                     except ValueError:
@@ -119,16 +133,23 @@ def run_skupszop_search(input_csv="books.csv", output_csv="skupszop_prices.csv",
                     except:
                         condition = "unknown"
 
-                    results.append([product_title, product_author, price, condition, link_url])
+                    row=[product_title, product_author, price, condition, link_url]
 
+                    # [8] saving results to CSV
+                    with open(output_csv, "a", newline="", encoding="utf-8") as f:
+                        writer = csv.writer(f)
+                        writer.writerow(row)
+                        
+                    # [9] sending result to Streamlit via callback
+                    if result_callback:
+                        try:
+                            result_callback(row)
+                        except Exception:
+                            pass
+                        
             except TimeoutException:
                 continue
 
-    # [8] saving results to CSV
-    if results:
-        with open(output_csv, "a", newline="", encoding="utf-8") as f:
-            writer = csv.writer(f)
-            writer.writerows(results)
 
     driver.quit()
     return output_csv
