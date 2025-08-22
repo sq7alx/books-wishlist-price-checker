@@ -9,7 +9,13 @@ st.set_page_config(page_title="SkupSzop Books Prices", layout="wide")
 st.title("Goodreads wishlist -> SkupSzop price checker")
 st.caption("Find your favorite books second-hand at SkupSzop")
 
+# adding https prefix if missing
+def normalize_goodreads_url(url: str) -> str:
+        if not url.startswith(("https://")):
+            url = "https://" + url
+        return url
 
+# checking if url is a goodreads shelf
 def is_goodreads_shelf(url: str) -> bool:
     try:
         parsed = urlparse(url)
@@ -41,6 +47,7 @@ with col1:
         url = DEFAULT_GOODREADS_URL
 
     if st.button("Submit", use_container_width=True):
+        url = normalize_goodreads_url(url)
         if not is_goodreads_shelf(url):
             st.error("Please enter a valid Goodreads shelf link!")
         else:
@@ -74,7 +81,7 @@ if st.session_state.running and not st.session_state.stop:
                 save_to_csv(books, "books.csv")
                 st.markdown(f"""
                     <div style="background-color:#d4edda; color:#155724; padding:15px; border-radius:10px; width:50%;">
-                        ✅ Successfully fetched {len(books)} books from Goodreads
+                        Successfully fetched {len(books)} books from Goodreads
                     </div>
                 """, unsafe_allow_html=True)
 
@@ -88,6 +95,9 @@ if st.session_state.running and not st.session_state.stop:
                     status_text.text(f"SkupSzop search {current}/{total}: {title}")
 
                 def update_skupszop_result(row):
+                    if isinstance(row[1],list):
+                        row[1] = row[1][0] if row[1] else "Unknown"
+                    
                     st.session_state.results_df.loc[len(st.session_state.results_df)] = row
                     temp_df = st.session_state.results_df.copy()
                     temp_df["Link"] = temp_df["Link"].apply(lambda x: f'<a href="{x}" target="_blank">Book page</a>')
@@ -103,6 +113,8 @@ if st.session_state.running and not st.session_state.stop:
 
                 if st.session_state.results_df.empty:
                     st.warning(f"No books found under {st.session_state.max_price} PLN on SkupSzop.")
+                else:
+                    st.success("Search ended")
 
     except Exception as e:
         st.error(f"An error occurred: {e}")

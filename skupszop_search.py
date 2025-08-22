@@ -1,5 +1,6 @@
 import csv
 import urllib.parse
+import re
 from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.chrome.service import Service
@@ -9,9 +10,28 @@ from selenium.common.exceptions import TimeoutException
 from webdriver_manager.chrome import ChromeDriverManager
 from difflib import SequenceMatcher
 
-# checking similarity between titles in csv and store results
-def is_author_similar(a, b, threshold=0.7):
-    return SequenceMatcher(None, a.casefold(), b.casefold()).ratio() >= threshold
+# normalizing and matching author names (e.g. "J.K. Rowling" = "Joanne Rowling")
+def normalize_name(name):
+    name = name.lower()
+    name =re.sub(r"[.,.]","",name)
+    parts = name.split()
+    return parts
+
+def is_author_match(csv_author, skupszop_authors, threshold = 0.7):
+    #authors_csv is the author name from the csv file
+    #skupszop_authors is a list of possible matching authors on SkupSzop
+    csv_parts = normalize_name(csv_author)
+    for skupszop_author in skupszop_authors:
+        skupszop_author_parts=normalize_name(skupszop_author)
+        
+        if set(csv_parts) == set(skupszop_author_parts):
+            return True
+        
+        similarity = SequenceMatcher(None," ".join(csv_parts)," ".join(skupszop_author_parts)).ratio()
+        if similarity>=threshold:
+            return True
+    return False
+
 
 def is_title_similar(a, b, threshold=0.8):
     return SequenceMatcher(None, a.casefold(), b.casefold()).ratio() >= threshold
@@ -41,7 +61,7 @@ def run_skupszop_search(
     options = webdriver.ChromeOptions()
     options.add_argument("--start-maximized")
     options.add_argument("--window-size=1920,1080")
-    #options.add_argument("--headless")
+    options.add_argument("--headless")
     driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=options)
 
     for idx, book in enumerate(books):
@@ -85,20 +105,20 @@ def run_skupszop_search(
                 except:
                     continue
                 try:
-                    author_elem = elem.find_element(By.CSS_SELECTOR, "div.product-card__author .author")
-                    candidate_author = author_elem.text.strip()
+                    author_elems = elem.find_element(By.CSS_SELECTOR, "div.product-card__author .author")
+                    candidate_authors = [a.text.strip() for a in author_elems]
                 except:
-                    candidate_author = ""
-                product_candidates.append((candidate_title, candidate_author, link))
+                    candidate_authors = []
+                product_candidates.append((candidate_title, candidate_authors, link))
         except TimeoutException:
             print(f"No results found for: {title}")
             continue
 
         # [6] filtering results by title & author similarity
         matching_links = []
-        for candidate_title, candidate_author, link in product_candidates:
+        for candidate_title, candidate_authors, link in product_candidates:
             if is_title_similar(candidate_title, title):
-                if not candidate_author or is_author_similar(candidate_author, author):
+                if not candidate_authors or is_author_match(candidate_authors, author):
                     matching_links.append(link)
 
         if not matching_links:
@@ -120,11 +140,12 @@ def run_skupszop_search(
                     product_title = title
 
                 try:
-                    product_author = driver.find_element(By.CSS_SELECTOR, ".product-right-title .author").text
-                    if not is_author_similar(product_author, author):
+                    author_elems_page = driver.find_elements(By.CSS_SELECTOR, ".product-author-box .authors span.author")
+                    product_authors_page = [a.text.strip() for a in author_elems_page]
+                    if not is_author_match(author, product_authors_page):
                         continue
                 except:
-                    product_author = author
+                    product_author = [author]
 
                 # iterate over condition boxes to extract prices
                 for box in condition_boxes:
