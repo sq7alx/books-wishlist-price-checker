@@ -32,14 +32,13 @@ def is_author_match(csv_author, skupszop_authors, threshold = 0.7):
             return True
     return False
 
-
 def is_title_similar(a, b, threshold=0.8):
     return SequenceMatcher(None, a.casefold(), b.casefold()).ratio() >= threshold
 
 def run_skupszop_search(
     input_csv="books.csv", 
     output_csv="skupszop_prices.csv", 
-    max_price=20, progress_callback=None, 
+    min_price=0, max_price=20, progress_callback=None, 
     result_callback=None
 ):
     
@@ -71,7 +70,7 @@ def run_skupszop_search(
         # inform Streamlit which book is processing
         if progress_callback:
             try:
-                progress_callback(idx + 1, total if total else 1, title)
+                progress_callback(idx + 1, total if total else 1, title, author)
             except Exception:
                 pass
 
@@ -105,7 +104,7 @@ def run_skupszop_search(
                 except:
                     continue
                 try:
-                    author_elems = elem.find_element(By.CSS_SELECTOR, "div.product-card__author .author")
+                    author_elems = elem.find_elements(By.CSS_SELECTOR, "div.product-card__author .author")
                     candidate_authors = [a.text.strip() for a in author_elems]
                 except:
                     candidate_authors = []
@@ -118,7 +117,7 @@ def run_skupszop_search(
         matching_links = []
         for candidate_title, candidate_authors, link in product_candidates:
             if is_title_similar(candidate_title, title):
-                if not candidate_authors or is_author_match(candidate_authors, author):
+                if not candidate_authors or is_author_match(author, candidate_authors):
                     matching_links.append(link)
 
         if not matching_links:
@@ -145,7 +144,7 @@ def run_skupszop_search(
                     if not is_author_match(author, product_authors_page):
                         continue
                 except:
-                    product_author = [author]
+                    product_authors_page = [author]
 
                 # iterate over condition boxes to extract prices
                 for box in condition_boxes:
@@ -164,7 +163,7 @@ def run_skupszop_search(
                     # checking if price <= max_price
                     try:
                         numeric_price = float(price.replace("PLN", "").replace(",", ".").strip())
-                        if numeric_price > max_price:
+                        if numeric_price > max_price or numeric_price < min_price:
                             continue
                     except ValueError:
                         continue
@@ -174,7 +173,7 @@ def run_skupszop_search(
                     except:
                         condition = "unknown"
 
-                    row=[product_title, product_author, price, condition, link_url]
+                    row = [product_title, product_authors_page, price, condition, link_url]
 
                     # [8] saving results to CSV
                     with open(output_csv, "a", newline="", encoding="utf-8") as f:

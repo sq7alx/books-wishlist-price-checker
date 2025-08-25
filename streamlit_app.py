@@ -50,22 +50,26 @@ with col_left:
     if not url:
         url = DEFAULT_GOODREADS_URL
 
-    # submit button
-    if st.button("Submit", use_container_width=True, key="submit_btn"):
-        url = normalize_goodreads_url(url)
-        if not is_goodreads_shelf(url):
-            st.error("Please enter a valid Goodreads shelf link!")
-        else:
-            st.session_state.stop = False
-            st.session_state.running = True
-            st.session_state.url = url
-            st.session_state.min_price = min_price
-            st.session_state.max_price = max_price
-            st.session_state.results_df = pd.DataFrame(columns=["Title", "Author", "Price", "Condition", "Link"])
+    btn_col1, btn_col2 = st.columns([1, 1], gap="small")
 
-    # stop button
-    if st.session_state.running:
-        st.button("Stop", on_click=stop_scraping, use_container_width=True, key="stop_btn")
+    with btn_col1:
+        # submit button
+        if st.button("Submit", use_container_width=True, key="submit_btn"):
+            url = normalize_goodreads_url(url)
+            if not is_goodreads_shelf(url):
+                st.error("Please enter a valid Goodreads shelf link!")
+            else:
+                st.session_state.stop = False
+                st.session_state.running = True
+                st.session_state.url = url
+                st.session_state.min_price = min_price
+                st.session_state.max_price = max_price
+                st.session_state.results_df = pd.DataFrame(columns=["Title", "Author", "Price", "Condition", "Link"])
+
+    with btn_col2:
+        # stop button
+        if st.session_state.running:
+            st.button("Stop", on_click=stop_scraping, use_container_width=True, key="stop_btn")
 
     status_placeholder = st.empty()
 
@@ -74,6 +78,7 @@ with col_left:
         try:
             books = []
             with st.spinner("Loading your Goodreads shelf..."):
+                # load books from Goodreads shelf
                 shelf_books = list(scrape_goodreads_shelf(st.session_state.url, delay=1.5, max_pages=100, debug=False))
                 for i, book in enumerate(shelf_books):
                     if st.session_state.stop:
@@ -84,6 +89,7 @@ with col_left:
                 if not books:
                     status_placeholder.warning("No books loaded")
                 else:
+                    # save to CSV
                     save_to_csv(books, "books.csv")
                     status_placeholder.success(f"Successfully fetched {len(books)} books from Goodreads")
 
@@ -92,6 +98,7 @@ with col_left:
                     progress_bar = st.progress(0, text="SkupSzop search")
 
                     def update_skupszop_progress(current, total, title, author):
+                        # inform Streamlit which book is processing
                         progress_bar.progress(current / total, text=f"SkupSzop search {current}/{total}: {title} ({author})")
 
                     # results in table
@@ -104,8 +111,8 @@ with col_left:
                             lambda x: f'<a href="{x}" target="_blank" style="color:#1E90FF; text-decoration:none; font-weight:bold;">Page</a>'
                         )
 
+                        # convert DataFrame to styled HTML table
                         table_html = temp_df.to_html(escape=False, index=False)
-
                         table_html = table_html.replace(
                             "<table",
                             '<table style="background-color:#1d232f; color:#ffffff; '
