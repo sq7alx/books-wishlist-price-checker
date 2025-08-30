@@ -124,50 +124,43 @@ def run_skupszop_search(
                 continue
 
             for link_url in matching_links:
-                page.goto(link_url)
-                try:
-                    page.wait_for_selector("div.condition-box", timeout=1500)
-                except PlaywrightTimeout:
-                    continue
+                product = page.locator(f'a[href="{link_url}"]').first.locator("..").locator("..")
 
                 try:
-                    product_title = page.locator(".product-right-title h1").inner_text()
-                except PlaywrightTimeout:
+                    product_title = product.locator("div.product-card__title a").inner_text().strip()
+                except:
                     product_title = title
 
                 try:
-                    product_authors_page = [a.inner_text().strip() for a in page.locator(".product-author-box .authors span.author").all()]
+                    product_authors_page = [a.inner_text().strip() for a in product.locator("div.product-card__author .author").all()]
                     if not is_author_match(author, product_authors_page):
                         continue
                 except:
                     product_authors_page = [author]
 
-                condition_boxes = page.locator("div.condition-box")
-                for i in range(condition_boxes.count()):
-                    box = condition_boxes.nth(i)
+                prices = []
+                conditions = []
+                for j in range(product.locator(".product-dropdown-condition-list li").count()):
+                    li = product.locator(".product-dropdown-condition-list li").nth(j)
                     try:
-                        price = box.locator(".condition-box-head-text .price span").inner_text().strip()
+                        price = li.locator(".dropdown-list-price span").inner_text().strip()
+                        condition = li.locator(".dropdown-list-condition").inner_text().strip()
+                        prices.append(price)
+                        conditions.append(condition)
                     except:
-                        try:
-                            price = box.locator(".condition-box-head-text .not-available").inner_text().strip()
-                        except:
-                            continue
+                        continue
 
+                # save results to csv
+                for price, condition in zip(prices, conditions):
                     try:
-                        numeric_price = float(price.replace("PLN", "").replace(",", ".").strip())
-                        if numeric_price > max_price or numeric_price < min_price:
+                        numeric_price = float(price.replace(",", "."))
+                        if numeric_price < min_price or numeric_price > max_price:
                             continue
                     except ValueError:
                         continue
 
-                    try:
-                        condition = box.locator(".condition-box-head-text .condition").inner_text().strip()
-                    except:
-                        condition = "unknown"
-
                     row = [product_title, product_authors_page, price, condition, link_url]
 
-                    # save results to csv
                     with open(output_csv, "a", newline="", encoding="utf-8") as f:
                         writer = csv.writer(f)
                         writer.writerow(row)

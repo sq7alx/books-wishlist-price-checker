@@ -5,6 +5,8 @@ import csv
 import time
 from typing import List, Dict
 import random
+from app import paths as p
+
 
 # [0] removing series name from book title
 def extract_main_title(title_element) -> str:
@@ -104,7 +106,7 @@ def extract_book_info(element) -> Dict[str, str]:
     return book_info if 'title' in book_info else None
 
 # [3] saving results to csv
-def save_to_csv(books: List[Dict[str, str]], filename: str = 'books.csv'):
+def save_to_csv(books: List[Dict[str, str]], filename: str = p.BOOKS_CSV):
     if not books:
         return 0
 
@@ -122,7 +124,7 @@ def save_to_csv(books: List[Dict[str, str]], filename: str = 'books.csv'):
     return len(books)
 
 # [4] main function used by streamlit_app.py
-def run_goodreads_scraper(url: str, output_csv: str = "books.csv") -> int:
+def run_goodreads_scraper(url: str, output_csv: str = p.BOOKS_CSV) -> int:
     books = scrape_goodreads_shelf(url, delay=1.5, max_pages=100, debug=False)
     if not books:
         return 0
