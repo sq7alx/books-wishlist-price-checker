@@ -1,8 +1,16 @@
+import sys
+import os
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
+import asyncio
+asyncio.set_event_loop_policy(asyncio.WindowsProactorEventLoopPolicy())
+
 import pandas as pd
 import streamlit as st
 from urllib.parse import urlparse
-from goodreads_list_to_csv import scrape_goodreads_shelf, save_to_csv
-from skupszop_search import run_skupszop_search
+from app import paths as p
+from app.goodreads_scraper import scrape_goodreads_shelf, save_to_csv
+from app.skupszop_search import run_skupszop_search
+
 
 st.set_page_config(page_title="SkupSzop Books Prices", layout="wide")
 st.title("Goodreads wishlist -> SkupSzop price checker")
@@ -41,8 +49,8 @@ with col_right:
     results_placeholder = st.empty()
 
 with col_left:
-    DEFAULT_GOODREADS_URL = "https://www.goodreads.com/review/list/26367680?shelf=read"
-    #DEFAULT_GOODREADS_URL = "https://www.goodreads.com/review/list/149269739-ola?shelf=test"
+    #DEFAULT_GOODREADS_URL = "https://www.goodreads.com/review/list/26367680?shelf=read"
+    DEFAULT_GOODREADS_URL = "https://www.goodreads.com/review/list/149269739-ola?shelf=test"
     
     url = st.text_input("Enter the Goodreads shelf link:", placeholder=DEFAULT_GOODREADS_URL)
     min_price, max_price = st.slider("Max price (PLN):", min_value=0, max_value=100, value=(0,20))
@@ -90,7 +98,7 @@ with col_left:
                     status_placeholder.warning("No books loaded")
                 else:
                     # save to CSV
-                    save_to_csv(books, "books.csv")
+                    save_to_csv(books, p.BOOKS_CSV)
                     status_placeholder.success(f"Successfully fetched {len(books)} books from Goodreads")
 
             if books and not st.session_state.stop:
@@ -125,8 +133,8 @@ with col_left:
                         results_placeholder.markdown(results_html, unsafe_allow_html=True)
 
                     run_skupszop_search(
-                        "books.csv",
-                        "skupszop_prices.csv",
+                        p.BOOKS_CSV,
+                        p.SKUPSZOP_CSV,
                         min_price=st.session_state.min_price,
                         max_price=st.session_state.max_price,
                         progress_callback=update_skupszop_progress,
@@ -134,9 +142,14 @@ with col_left:
                     )
 
                     if st.session_state.results_df.empty:
-                        status_placeholder.warning(f"No books found under {st.session_state.max_price} PLN on SkupSzop.")
+                        progress_bar.empty()
+                        status_placeholder.warning(
+                            f"No books found under {st.session_state.max_price} PLN on SkupSzop."
+                        )
                     else:
+                        progress_bar.empty()
                         status_placeholder.success("Search ended")
+
 
         except Exception as e:
             status_placeholder.error(f"An error occurred: {e}")
