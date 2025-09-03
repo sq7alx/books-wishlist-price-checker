@@ -1,8 +1,13 @@
 import sys
 import os
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 import asyncio
-asyncio.set_event_loop_policy(asyncio.WindowsProactorEventLoopPolicy())
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
+
+
+# Windows-only event loop setup
+if sys.platform.startswith("win"):
+    asyncio.set_event_loop_policy(asyncio.WindowsProactorEventLoopPolicy())
+
 
 import pandas as pd
 import streamlit as st
