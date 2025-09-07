@@ -14,7 +14,7 @@ import streamlit as st
 from urllib.parse import urlparse
 from app import paths as p
 from app.goodreads_scraper import scrape_goodreads_shelf, save_to_csv
-from app.skupszop_search import run_skupszop_search
+from app.skupszop_search_async import run_skupszop_search_async
 
 
 st.set_page_config(page_title="SkupSzop Books Prices", layout="wide")
@@ -137,14 +137,15 @@ with col_left:
                         results_html = f'<div style="overflow-x:auto;">{table_html}</div>'
                         results_placeholder.markdown(results_html, unsafe_allow_html=True)
 
-                    run_skupszop_search(
+                    asyncio.run(run_skupszop_search_async(
                         p.BOOKS_CSV,
                         p.SKUPSZOP_CSV,
                         min_price=st.session_state.min_price,
                         max_price=st.session_state.max_price,
                         progress_callback=update_skupszop_progress,
                         result_callback=update_skupszop_result
-                    )
+                    ))
+
 
                     if st.session_state.results_df.empty:
                         progress_bar.empty()
